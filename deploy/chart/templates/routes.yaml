@@ -1,0 +1,65 @@
+{{- $root := . -}}
+{{- range $name, $service := .Values.services }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name | lower }}
+spec:
+  parentRefs:
+    - name: {{ $root.Release.Name }}
+  {{- with $root.Values.hostnames }}
+  hostnames: {{ toJson . }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/{{ $name }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove: [X-Request-Id]
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ $root.Release.Name }}-bounded-body
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ $root.Release.Name }}-security
+      backendRefs:
+        - name: {{ $service }}
+          port: 8000
+---
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Release.Name }}-web
+spec:
+  parentRefs:
+    - name: {{ .Release.Name }}
+  {{- with .Values.hostnames }}
+  hostnames: {{ toJson . }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: traefik.io
+            kind: Middleware
+            name: {{ .Release.Name }}-security
+      backendRefs:
+        - name: {{ .Values.webService }}
+          port: 8080

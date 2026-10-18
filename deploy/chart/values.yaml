@@ -1,0 +1,96 @@
+hostnames: []
+tlsSecretName: ''
+localDevelopment: false
+webService: platform-web
+services:
+  authService: platform-auth
+  accountsService: platform-accounts
+  virtualMoney: platform-virtual-money
+  pokerService: platform-poker
+  cryptoService: platform-crypto
+traefik:
+  image:
+    repository: traefik
+    tag: v3.7.15
+    digest: sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
+  gateway:
+    enabled: false
+  gatewayClass:
+    enabled: false
+  ingressClass:
+    enabled: false
+  ingressRoute:
+    dashboard:
+      enabled: false
+  api:
+    dashboard: false
+  providers:
+    kubernetesIngress:
+      enabled: false
+    kubernetesCRD:
+      enabled: true
+      allowCrossNamespace: false
+      namespaces:
+      - foundation
+    kubernetesGateway:
+      enabled: true
+      namespaces:
+      - foundation
+      experimentalChannel: false
+  service:
+    type: ClusterIP
+  ports:
+    web:
+      port: 8000
+      exposedPort: 80
+      forwardedHeaders:
+        insecure: false
+      transport:
+        respondingTimeouts:
+          readTimeout: 30s
+          writeTimeout: 0s
+          idleTimeout: 120s
+        lifeCycle:
+          requestAcceptGraceTimeout: 2s
+          graceTimeOut: 15s
+    websecure:
+      port: 8443
+      exposedPort: 443
+      http:
+        tls:
+          enabled: false
+      forwardedHeaders:
+        insecure: false
+  deployment:
+    replicas: 1
+    terminationGracePeriodSeconds: 25
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  additionalArguments:
+  - --global.checknewversion=false
+  - --global.sendanonymoususage=false
+  log:
+    format: json
+    level: INFO
+  accessLog:
+    enabled: true
+    format: json
+    fields:
+      defaultMode: keep
+      headers:
+        defaultMode: drop

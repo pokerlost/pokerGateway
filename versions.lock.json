@@ -1,0 +1,8 @@
+{
+  "traefikVersion": "3.7.15",
+  "image": "traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368",
+  "chartVersion": "42.0.0",
+  "chartSha256": "a6ede324662ddcca0160a5ce639b7b5b9dd40a20a475e1101e9f95b5e5d83dd5",
+  "chartSource": "https://traefik.github.io/charts/traefik/traefik-42.0.0.tgz",
+  "gatewayApiVersion": "v1.6.3"
+}
