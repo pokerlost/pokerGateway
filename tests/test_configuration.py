@@ -62,3 +62,11 @@ def test_context_and_chart_pin_only_intended_artifacts() -> None:
     gateway = compose["services"]["gateway"]
     assert gateway["read_only"] and gateway["cap_drop"] == ["ALL"]
     assert all(port.startswith("127.0.0.1:") for port in gateway["ports"])
+
+
+def test_gateway_tls_policy_matches_the_file_provider() -> None:
+    policy = yaml.safe_load(
+        (ROOT / "deploy/chart/templates/tls-options.yaml").read_text()
+    )
+    assert policy["kind"] == "TLSOption" and policy["metadata"]["name"] == "default"
+    assert policy["spec"] == {"minVersion": "VersionTLS13", "sniStrict": True}
