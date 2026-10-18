@@ -99,14 +99,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
-          IMAGE_METADATA: ${{ steps.publish.outputs.metadata }}
         run: |
           set -euo pipefail
+          image="ghcr.io/pokerlost/pokergateway@$IMAGE_DIGEST"
+          docker buildx imagetools inspect "$image" --raw > "$RUNNER_TEMP/published-index.json"
+          child=$(python3 -c 'import json,os; from pathlib import Path; data=json.loads((Path(os.environ["RUNNER_TEMP"])/"published-index.json").read_text()); matches=[m["digest"] for m in data["manifests"] if m.get("platform")=={"architecture":"amd64","os":"linux"}]; assert len(matches)==1,matches; print(matches[0])')
+          docker buildx imagetools inspect "ghcr.io/pokerlost/pokergateway@$child" --raw > "$RUNNER_TEMP/published-manifest.json"
           python3 - <<'PYTHON'
           import json, os
           from pathlib import Path
           tested = (Path(os.environ['RUNNER_TEMP']) / 'gateway-checks/coverage/tested-image-id.txt').read_text().strip()
-          assert json.loads(os.environ['IMAGE_METADATA'])['containerimage.config.digest'] == tested
+          published = json.loads((Path(os.environ['RUNNER_TEMP']) / 'published-manifest.json').read_text())
+          assert published['config']['digest'] == tested, (published['config']['digest'], tested)
           PYTHON
           test "$(gh api orgs/pokerlost/packages/container/pokergateway --jq .visibility)" = private
           printf 'ghcr.io/pokerlost/pokergateway@%s\n' "$IMAGE_DIGEST" | tee "$RUNNER_TEMP/gateway-image-reference.txt" >> "$GITHUB_STEP_SUMMARY"
@@ -121,13 +125,17 @@ jobs:
         run: rm -rf "$RUNNER_TEMP/registry-auth"
   required:
     if: always()
-    needs: [gateway]
+    needs: [gateway, publish-reviewed-runtime]
     runs-on: ubuntu-24.04
     steps:
-      - env: {RESULTS: '${{ toJSON(needs) }}'}
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
         run: |
           python3 - <<'PYTHON'
           import json, os
           results = json.loads(os.environ['RESULTS'])
-          assert all(job['result'] == 'success' for job in results.values()), results
+          assert results['gateway']['result'] == 'success', results
+          publication = results['publish-reviewed-runtime']['result']
+          assert publication == 'success' or (os.environ['EVENT'] == 'push' and publication == 'skipped'), results
           PYTHON
