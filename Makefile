@@ -6,7 +6,7 @@ UV ?= uv
 help:
 	@echo "install lint typecheck test check build chart run"
 install:
-	$(UV) sync --locked
+	$(UV) sync --locked --group fixture
 lint:
 	$(UV) run --locked ruff check tests
 	$(UV) run --locked ruff format --check tests

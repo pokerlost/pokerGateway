@@ -38,7 +38,8 @@ traefik:
       - foundation
       experimentalChannel: false
   service:
-    type: ClusterIP
+    spec:
+      type: ClusterIP
   ports:
     web:
       port: 8000

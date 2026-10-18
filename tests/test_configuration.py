@@ -57,6 +57,7 @@ def test_context_and_chart_pin_only_intended_artifacts() -> None:
     assert not values["traefik"]["providers"]["kubernetesIngress"]["enabled"]
     assert not values["traefik"]["providers"]["kubernetesCRD"]["allowCrossNamespace"]
     assert values["traefik"]["securityContext"]["readOnlyRootFilesystem"]
+    assert values["traefik"]["service"]["spec"]["type"] == "ClusterIP"
     compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
     gateway = compose["services"]["gateway"]
     assert gateway["read_only"] and gateway["cap_drop"] == ["ALL"]
