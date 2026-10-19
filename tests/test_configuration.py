@@ -46,7 +46,14 @@ def test_file_provider_has_no_socket_admin_retry_or_unbounded_body() -> None:
 
 def test_context_and_chart_pin_only_intended_artifacts() -> None:
     ignored = (ROOT / ".dockerignore").read_text().splitlines()
-    assert ignored == ["*", "!Dockerfile", "!config/", "!config/**"]
+    assert ignored == [
+        "*",
+        "!Dockerfile",
+        "!config/",
+        "!config/**",
+        ".vscode/",
+        ".serena/",
+    ]
     lock = json.loads((ROOT / "versions.lock.json").read_text())
     chart = ROOT / f"deploy/chart/charts/traefik-{lock['chartVersion']}.tgz"
     assert hashlib.sha256(chart.read_bytes()).hexdigest() == lock["chartSha256"]

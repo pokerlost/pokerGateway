@@ -2,3 +2,5 @@
 !Dockerfile
 !config/
 !config/**
+.vscode/
+.serena/
