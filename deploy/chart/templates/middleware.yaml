@@ -1,0 +1,24 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-bounded-body
+spec:
+  buffering:
+    maxRequestBodyBytes: 1048576
+    memRequestBodyBytes: 65536
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-security
+spec:
+  headers:
+    customResponseHeaders:
+      X-Content-Type-Options: "nosniff"
+      Referrer-Policy: "no-referrer"
+      X-Frame-Options: "DENY"
+      Content-Security-Policy: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+      Cross-Origin-Opener-Policy: "same-origin"
+      Cross-Origin-Embedder-Policy: "require-corp"
+      Cross-Origin-Resource-Policy: "same-origin"
+      Permissions-Policy: "camera=(), microphone=(), geolocation=()"

@@ -1,0 +1,32 @@
+[project]
+name = "pokergateway-verification"
+version = "0.1.0.dev0"
+requires-python = ">=3.14"
+dependencies = []
+[dependency-groups]
+dev = [
+    "pytest>=9,<10",
+    "ruff==0.16.4",
+    "mypy>=2.3,<3",
+    "PyYAML>=6,<7",
+    "types-PyYAML>=6,<7",
+    "httpx>=0.28,<1",
+    "websockets>=15,<17",
+    "typer==0.27.3",
+]
+fixture = ["aiohttp>=3.13,<4"]
+[tool.uv]
+package = false
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config --import-mode=importlib"
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "N", "RUF", "UP", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+[tool.mypy]
+python_version = "3.14"
+strict = true

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "localDevelopment",
+    "webService",
+    "services"
+  ],
+  "properties": {
+    "localDevelopment": {
+      "type": "boolean"
+    },
+    "hostnames": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tlsSecretName": {
+      "type": "string"
+    },
+    "webService": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "localDevelopment": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tlsSecretName": {
+            "minLength": 1
+          },
+          "hostnames": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}
