@@ -9,3 +9,10 @@ Platform composition, image/route references, data-preserving shutdown and rollb
 The chart installs the controller default TLSOption with TLS 1.3 minimum and strict SNI, matching the file-provider runtime. Deploy one default TLSOption per controller; this platform owns one gateway controller scoped to its namespace. HTTPS requires an explicit hostname and existing certificate Secret. Verify the issuing CA and SNI; never bypass certificate validation.
 
 Development OCI publication requires the exact full `GATEWAY_IMAGE_REVIEWED_SHA` repository variable and successful fresh proxy tests from the same run. Publication is restricted to the approved private `ghcr.io/pokerlost/pokergateway` package, checks the tested runtime configuration identity, and emits SBOM/provenance. No release or deployment is triggered.
+
+The CI transfer is a Docker image archive, which contains configuration/layers but no attested
+OCI index. Native Buildx checks the cached graph against the tested configuration before
+registry access, then exports that same graph with SBOM/provenance. Direct archive promotion
+would lose those attestations; a cache miss can rebuild and must still match the tested
+configuration. The published OCI index digest and Docker configuration ID are separate
+identities. The existing BuildKit cache remains the only build-cache mechanism.
