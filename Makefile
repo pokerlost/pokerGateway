@@ -13,16 +13,21 @@ QUALITY_TEST := test-unit
 UV ?= uv
 QUALITY_EXTRA_TARGETS := chart-check
 BUILD_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
-COVERAGE_COMMAND = sh -ec 'printf "%s\n" "Coverage: external Traefik and declarative configuration notApplicable; bundled Go guard notMeasured (executed by real Yaegi proxy tests, no instrumented Go coverage)." | tee coverage/summary.md'
+COVERAGE_COMMAND = sh -ec 'printf "%s\n" "Coverage: external Traefik and declarative configuration notApplicable; bundled Go guard and Python metadata tooling notMeasured (executed by native tests, without coverage instrumentation)." | tee coverage/summary.md'
 VERIFY_COMMAND = GATEWAY_TEST_IMAGE=$(RUNTIME_IMAGE) $(MAKE) CONTAINERIZED=1 test && $(DOCKER) image inspect $(RUNTIME_IMAGE) --format '{{.Id}}' > coverage/tested-image-id.txt && git rev-parse HEAD > coverage/source-commit.txt
 IMAGE_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
 BUILD_RECEIPT_COMMAND := true
-VERSION_COMMAND = $(QUALITY_RUN) python docker/project_metadata.py version
-RELEASE_CHECK_COMMAND = $(DOCKER) image inspect $(RUNTIME_IMAGE) > coverage/runtime-image.json && $(QUALITY_RUN) python docker/project_metadata.py release-check
+VERSION_COMMAND = $(QUALITY_RUN) python -m docker.project_metadata version
+RELEASE_CHECK_COMMAND = $(DOCKER) image inspect $(RUNTIME_IMAGE) > coverage/runtime-image.json && $(QUALITY_RUN) python -m docker.project_metadata release-check
 RECEIPT_COMMAND = $(QUALITY_RUN) python docker/release.py receipt
 OFFLINE_PREFLIGHT_COMMAND = $(DOCKER) image inspect pokergateway:fixture traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368 >/dev/null || { echo "BLOCKED: prepare pinned Traefik and fixture images online first." >&2; exit 2; }
 CI_LOCAL_TARGETS := check coverage build chart verify release-check
 include docker/quality-python.mk
+
+.PHONY: native-prerequisites
+help: native-prerequisites
+native-prerequisites:
+	@printf '%s\n' 'Gateway proxy acceptance also requires host uv 0.12.15; Docker owns the pinned runtime and fixture images.'
 .PHONY: build-metadata
 build-metadata:
 	@printf '%s\n' 'APP_VERSION=$(APP_VERSION)' 'SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)'
@@ -58,7 +63,7 @@ OUTPUT_DIR ?= dist
 chart: chart-check
 	$(HELM) package deploy/chart --destination $(OUTPUT_DIR)
 test-unit:
-	$(UV) run --locked pytest tests/test_configuration.py --junitxml=coverage/configuration.xml
+	$(UV) run --locked pytest tests/test_configuration.py tests/test_metadata.py --junitxml=coverage/configuration.xml
 test:
 	$(UV) run --locked --python 3.14.7 pytest tests/test_proxy.py --junitxml=coverage/proxy.xml
 check: lint typecheck test-unit chart-check
