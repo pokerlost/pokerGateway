@@ -29,7 +29,7 @@ build-metadata:
 
 .PHONY: fixture-image chart
 fixture-image:
-	$(DOCKER) buildx build --file tests/Dockerfile $(DOCKER_BUILD_ARGS) --load --tag pokergateway:fixture .
+	$(DOCKER) buildx build --file tests/Dockerfile $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --load --tag pokergateway:fixture .
 verify: image fixture-image
 chart: quality-image
 	@mkdir -p dist
