@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import socket
@@ -39,9 +40,37 @@ class Proxy:
 
 
 @pytest.fixture(scope="module")
-def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
-    directory = tmp_path_factory.mktemp("gateway")
+def proxy_network() -> Iterator[tuple[str, str]]:
     network = "codex-gateway-" + uuid4().hex[:12]
+    docker(
+        "network",
+        "create",
+        "--internal",
+        "--label",
+        "io.codex.owner=platform-task-gateway",
+        network,
+    )
+    try:
+        configured = json.loads(docker("network", "inspect", network))[0]
+        subnet = next(
+            value
+            for entry in configured["IPAM"]["Config"]
+            if isinstance(
+                value := ipaddress.ip_network(entry["Subnet"]), ipaddress.IPv4Network
+            )
+        )
+        # The two dynamic upstreams use the first available addresses.
+        yield network, str(subnet.network_address + 10)
+    finally:
+        docker("network", "rm", network)
+
+
+@pytest.fixture(scope="module")
+def proxy(
+    tmp_path_factory: pytest.TempPathFactory, proxy_network: tuple[str, str]
+) -> Iterator[Proxy]:
+    directory = tmp_path_factory.mktemp("gateway")
+    network, address = proxy_network
     containers: list[str] = []
     cert, key = directory / "cert.pem", directory / "key.pem"
     subprocess.run(
@@ -61,7 +90,7 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             "-subj",
             "/CN=localhost",
             "-addext",
-            "subjectAltName=DNS:localhost,IP:127.0.0.1",
+            f"subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{address}",
         ],
         capture_output=True,
         check=True,
@@ -161,14 +190,12 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
     extra.write_text(yaml.safe_dump(content))
     os.chmod(upstreams, 0o444)
     os.chmod(extra, 0o444)
-    docker(
-        "network", "create", "--label", "io.codex.owner=platform-task-gateway", network
-    )
     try:
         for name in ("one", "two"):
             containers.append(
                 docker(
                     "run",
+                    "--pull=never",
                     "--detach",
                     "--read-only",
                     "--network",
@@ -188,6 +215,7 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             )
         identifier = docker(
             "run",
+            "--pull=never",
             "--detach",
             "--read-only",
             "--network",
@@ -198,10 +226,8 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             "ALL",
             "--security-opt",
             "no-new-privileges:true",
-            "--publish",
-            "127.0.0.1::8080",
-            "--publish",
-            "127.0.0.1::8443",
+            "--ip",
+            address,
             "--tmpfs",
             "/tmp:rw,noexec,nosuid,size=32m",
             "--mount",
@@ -215,11 +241,9 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             os.environ.get("GATEWAY_TEST_IMAGE", "pokergateway:candidate"),
         )
         containers.append(identifier)
-        http_port = docker("port", identifier, "8080/tcp").rsplit(":", 1)[1]
-        tls_port = docker("port", identifier, "8443/tcp").rsplit(":", 1)[1]
         result = Proxy(
-            f"http://127.0.0.1:{http_port}",
-            f"https://localhost:{tls_port}",
+            f"http://{address}:8080",
+            f"https://{address}:8443",
             identifier,
             cert,
             tuple(containers[:-1]),
@@ -248,7 +272,6 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             (evidence / "proxy-runtime.log").write_text(docker("logs", containers[-1]))
         for identifier in reversed(containers):
             docker("rm", "--force", identifier)
-        docker("network", "rm", network)
 
 
 def test_real_version_security_readiness_and_balancing(proxy: Proxy) -> None:

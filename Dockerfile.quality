@@ -15,8 +15,3 @@ FROM quality-dependencies AS quality
 COPY --chmod=u=rwX,go=rX . ./
 RUN --mount=type=cache,id=python-quality-uv-314-linux-amd64,target=/root/.cache/uv,sharing=locked uv sync --locked --all-groups
 CMD ["make", "check"]
-
-FROM quality AS package-build
-RUN --mount=type=cache,id=python-quality-uv-314-linux-amd64,target=/root/.cache/uv,sharing=locked uv build --wheel --sdist --out-dir /artifacts
-FROM scratch AS artifacts
-COPY --from=package-build /artifacts/ /
