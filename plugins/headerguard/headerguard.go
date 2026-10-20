@@ -3,11 +3,13 @@
 package headerguard
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"regexp"
 )
@@ -24,6 +26,35 @@ func CreateConfig() *Config { return &Config{} }
 type guard struct {
 	next   http.Handler
 	config Config
+}
+
+// correlatedWriter sets the final response ID after upstream headers are copied.
+// Native ResponseController unwrapping and explicit streaming interfaces preserve WS/H2.
+type correlatedWriter struct {
+	http.ResponseWriter
+	id string
+}
+
+func (w *correlatedWriter) Header() http.Header {
+	headers := w.ResponseWriter.Header()
+	headers.Set("X-Request-ID", w.id)
+	return headers
+}
+
+func (w *correlatedWriter) WriteHeader(status int) {
+	w.Header()
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *correlatedWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *correlatedWriter) Flush() {
+	w.Header()
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+func (w *correlatedWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(w.ResponseWriter).Hijack()
 }
 
 var identity = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]{0,63}$`)
@@ -62,6 +93,7 @@ func (g *guard) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id = hex.EncodeToString(data)
 	}
 	r.Header.Set("X-Request-ID", id)
+	w = &correlatedWriter{ResponseWriter: w, id: id}
 	w.Header().Set("X-Request-ID", id)
 	if r.Method == "OPTIONS" && r.Header.Get("Access-Control-Request-Method") != "" {
 		fail(w, http.StatusForbidden, "POKERLOST_CROSS_ORIGIN_DISABLED")

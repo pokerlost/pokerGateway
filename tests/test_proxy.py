@@ -98,6 +98,7 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
                             "middlewares": [
                                 "security",
                                 "bounded-body",
+                                "static-guard",
                                 "technical-prefix",
                             ],
                         },
@@ -337,6 +338,9 @@ def test_real_https_and_websockets_keep_one_upstream_per_connection(
             open_timeout=5,
             close_timeout=3,
         ) as socket:
+            if socket.response is None:
+                raise AssertionError("The real WebSocket handshake has no response")
+            assert len(socket.response.headers.get_all("X-Request-ID")) == 1
             owners = set()
             for index in range(5):
                 socket.send(f"message-{index}")

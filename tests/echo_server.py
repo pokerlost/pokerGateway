@@ -95,6 +95,15 @@ async def handle(request: web.Request) -> web.StreamResponse:
     )
 
 
+async def prepare_correlation(
+    request: web.Request, response: web.StreamResponse
+) -> None:
+    """Mirror the actual backend response boundary, including a WS upgrade."""
+    if request_id := request.headers.get("X-Request-ID"):
+        response.headers["X-Request-ID"] = request_id
+
+
 application = web.Application(client_max_size=2 * 1024 * 1024)
+application.on_response_prepare.append(prepare_correlation)
 application.router.add_route("*", "/{path:.*}", handle)
 web.run_app(application, host="0.0.0.0", port=8080, access_log=None, print=None)
