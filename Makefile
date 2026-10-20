@@ -5,10 +5,10 @@ RUNTIME_IMAGE := pokergateway:candidate
 QUALITY_TEST := test-unit
 UV ?= uv
 QUALITY_EXTRA_TARGETS := chart-check
-BUILD_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) --load --tag $(RUNTIME_IMAGE) .
+BUILD_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
 COVERAGE_COMMAND = sh -ec 'printf "%s\n" "Coverage: external Traefik and declarative configuration notApplicable; bundled Go guard notMeasured (executed by real Yaegi proxy tests, no instrumented Go coverage)." | tee coverage/summary.md'
 VERIFY_COMMAND = $(MAKE) CONTAINERIZED=1 test && $(DOCKER) image inspect $(RUNTIME_IMAGE) --format '{{.Id}}' > coverage/tested-image-id.txt && git rev-parse HEAD > coverage/source-commit.txt
-IMAGE_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) --load --tag $(RUNTIME_IMAGE) .
+IMAGE_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
 include docker/quality-python.mk
 .PHONY: fixture-image chart
 fixture-image:
