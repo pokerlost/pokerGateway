@@ -55,6 +55,11 @@ def test_context_and_chart_pin_only_intended_artifacts() -> None:
         "!plugins/",
         "!plugins/headerguard/",
         "!plugins/headerguard/**",
+        "",
+        "!LICENSE",
+        "!THIRD_PARTY_NOTICES.md",
+        "!LICENSES/",
+        "!LICENSES/**",
     ]
     lock = json.loads((ROOT / "versions.lock.json").read_text())
     chart = ROOT / f"deploy/chart/charts/traefik-{lock['chartVersion']}.tgz"
