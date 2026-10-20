@@ -3,136 +3,147 @@ http:
     auth-web:
       entryPoints:
       - web
-      rule: Path(`/api/authService`) || PathPrefix(`/api/authService/`)
+      rule: Header(`x-pokerlost-serviceId`, `authService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: auth
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - auth-prefix
     auth-websecure:
       entryPoints:
       - websecure
-      rule: Path(`/api/authService`) || PathPrefix(`/api/authService/`)
+      rule: Header(`x-pokerlost-serviceId`, `authService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: auth
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - auth-prefix
       tls: {}
     accounts-web:
       entryPoints:
       - web
-      rule: Path(`/api/accountsService`) || PathPrefix(`/api/accountsService/`)
+      rule: Header(`x-pokerlost-serviceId`, `accountsService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: accounts
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - accounts-prefix
     accounts-websecure:
       entryPoints:
       - websecure
-      rule: Path(`/api/accountsService`) || PathPrefix(`/api/accountsService/`)
+      rule: Header(`x-pokerlost-serviceId`, `accountsService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: accounts
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - accounts-prefix
       tls: {}
     virtual-money-web:
       entryPoints:
       - web
-      rule: Path(`/api/virtualMoney`) || PathPrefix(`/api/virtualMoney/`)
+      rule: Header(`x-pokerlost-serviceId`, `virtualMoney`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: virtual-money
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - virtual-money-prefix
     virtual-money-websecure:
       entryPoints:
       - websecure
-      rule: Path(`/api/virtualMoney`) || PathPrefix(`/api/virtualMoney/`)
+      rule: Header(`x-pokerlost-serviceId`, `virtualMoney`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: virtual-money
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - virtual-money-prefix
       tls: {}
     poker-web:
       entryPoints:
       - web
-      rule: Path(`/api/pokerService`) || PathPrefix(`/api/pokerService/`)
+      rule: Header(`x-pokerlost-serviceId`, `pokerService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: poker
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - poker-prefix
     poker-websecure:
       entryPoints:
       - websecure
-      rule: Path(`/api/pokerService`) || PathPrefix(`/api/pokerService/`)
+      rule: Header(`x-pokerlost-serviceId`, `pokerService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: poker
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - poker-prefix
       tls: {}
     crypto-web:
       entryPoints:
       - web
-      rule: Path(`/api/cryptoService`) || PathPrefix(`/api/cryptoService/`)
+      rule: Header(`x-pokerlost-serviceId`, `cryptoService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: crypto
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - crypto-prefix
     crypto-websecure:
       entryPoints:
       - websecure
-      rule: Path(`/api/cryptoService`) || PathPrefix(`/api/cryptoService/`)
+      rule: Header(`x-pokerlost-serviceId`, `cryptoService`) && PathRegexp(`^/[a-z][A-Za-z0-9]*$`)
       priority: 100
       service: crypto
       middlewares:
       - security
+      - header-guard
       - bounded-body
-      - remove-client-request-id
-      - crypto-prefix
       tls: {}
     website-web:
       entryPoints:
       - web
-      rule: PathPrefix(`/`) && !(Path(`/api`) || PathPrefix(`/api/`) || PathPrefix(`/realtime`))
-      priority: 1
+      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`) || Path(`/about`) || Path(`/game`) || Path(`/game/`) || Path(`/favicon.ico`) || Path(`/favicon.svg`) || Path(`/robots.txt`) || PathPrefix(`/assets/`) || PathPrefix(`/game/`))
+      priority: 200
       service: website
       middlewares:
       - security
+      - static-guard
       - bounded-body
+    reject-web:
+      entryPoints:
+      - web
+      rule: PathPrefix(`/`)
+      priority: 1
+      service: noop@internal
+      middlewares:
+      - security
+      - reject-service
     website-websecure:
       entryPoints:
       - websecure
-      rule: PathPrefix(`/`) && !(Path(`/api`) || PathPrefix(`/api/`) || PathPrefix(`/realtime`))
-      priority: 1
+      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`) || Path(`/about`) || Path(`/game`) || Path(`/game/`) || Path(`/favicon.ico`) || Path(`/favicon.svg`) || Path(`/robots.txt`) || PathPrefix(`/assets/`) || PathPrefix(`/game/`))
+      priority: 200
       service: website
       middlewares:
       - security
+      - static-guard
       - bounded-body
+      tls: {}
+    reject-websecure:
+      entryPoints:
+      - websecure
+      rule: PathPrefix(`/`)
+      priority: 1
+      service: noop@internal
+      middlewares:
+      - security
+      - reject-service
       tls: {}
   middlewares:
     security:
@@ -153,61 +164,17 @@ http:
       buffering:
         maxRequestBodyBytes: 1048576
         memRequestBodyBytes: 65536
-    remove-client-request-id:
-      headers:
-        customRequestHeaders:
-          X-Request-Id: ''
-    auth-prefix:
-      stripPrefix:
-        prefixes:
-        - /api/authService
-    accounts-prefix:
-      stripPrefix:
-        prefixes:
-        - /api/accountsService
-    virtual-money-prefix:
-      stripPrefix:
-        prefixes:
-        - /api/virtualMoney
-    poker-prefix:
-      stripPrefix:
-        prefixes:
-        - /api/pokerService
-    crypto-prefix:
-      stripPrefix:
-        prefixes:
-        - /api/cryptoService
-  services:
-    auth:
-      loadBalancer:
-        servers:
-        - url: http://auth:8000
-        passHostHeader: true
-    accounts:
-      loadBalancer:
-        servers:
-        - url: http://accounts:8000
-        passHostHeader: true
-    virtual-money:
-      loadBalancer:
-        servers:
-        - url: http://virtual-money:8000
-        passHostHeader: true
-    poker:
-      loadBalancer:
-        servers:
-        - url: http://poker:8000
-        passHostHeader: true
-    crypto:
-      loadBalancer:
-        servers:
-        - url: http://crypto:8000
-        passHostHeader: true
-    website:
-      loadBalancer:
-        servers:
-        - url: http://web:8080
-        passHostHeader: true
+    header-guard:
+      plugin:
+        headerguard: {}
+    static-guard:
+      plugin:
+        headerguard:
+          static: true
+    reject-service:
+      plugin:
+        headerguard:
+          rejectUnknown: true
 tls:
   options:
     default:

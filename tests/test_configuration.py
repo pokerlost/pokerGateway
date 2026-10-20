@@ -34,13 +34,11 @@ def test_file_provider_has_no_socket_admin_retry_or_unbounded_body() -> None:
         matching = [
             router
             for router in routes["http"]["routers"].values()
-            if f"/api/{name}" in router["rule"]
+            if f"`{name}`" in router["rule"]
         ]
         assert len(matching) == 2
         assert all("bounded-body" in router["middlewares"] for router in matching)
-        assert all(
-            "remove-client-request-id" in router["middlewares"] for router in matching
-        )
+        assert all("header-guard" in router["middlewares"] for router in matching)
     assert routes["tls"]["options"]["default"]["minVersion"] == "VersionTLS13"
 
 
@@ -53,13 +51,27 @@ def test_context_and_chart_pin_only_intended_artifacts() -> None:
         "!config/**",
         ".vscode/",
         ".serena/",
+        "",
+        "!plugins/",
+        "!plugins/headerguard/",
+        "!plugins/headerguard/**",
+        "",
+        "!LICENSE",
+        "!THIRD_PARTY_NOTICES.md",
+        "!LICENSES/",
+        "!LICENSES/**",
     ]
     lock = json.loads((ROOT / "versions.lock.json").read_text())
     chart = ROOT / f"deploy/chart/charts/traefik-{lock['chartVersion']}.tgz"
     assert hashlib.sha256(chart.read_bytes()).hexdigest() == lock["chartSha256"]
     assert lock["gatewayApiVersion"] == "v1.6.3"
     values = yaml.safe_load((ROOT / "deploy/chart/values.yaml").read_text())
-    assert values["traefik"]["image"]["digest"] in lock["image"]
+    assert values["traefik"]["image"]["repository"] == "ghcr.io/pokerlost/pokergateway"
+    assert lock["image"] in (ROOT / "Dockerfile").read_text()
+    assert (
+        "--experimental.localPlugins.headerguard.moduleName=github.com/pokerlost/headerguard"
+        in values["traefik"]["additionalArguments"]
+    )
     assert values["traefik"]["providers"]["kubernetesGateway"]["enabled"]
     assert not values["traefik"]["providers"]["kubernetesIngress"]["enabled"]
     assert not values["traefik"]["providers"]["kubernetesCRD"]["allowCrossNamespace"]

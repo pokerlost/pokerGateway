@@ -2,7 +2,7 @@
 
 Local file provider uses Compose DNS. The only listeners exposed by Compose are loopback high ports; ping remains internal. Proxy headers are not trusted from arbitrary peers. Request bodies are limited to 1 MiB, read/header waits are bounded, and WebSocket connections use the standard Traefik upgrade path. There is no blanket retry middleware.
 
-Access logs drop all request/response headers and never capture bodies. Client-provided request IDs are removed before a backend; the backend owns server-generated IDs. Authorization headers required by an implemented backend are preserved in transit and omitted from logs. Unknown API/realtime paths are rejected instead of serving SPA HTML.
+Access logs retain only a validated X-Request-ID and bounded safe fields, omitting URLs/query strings and bodies. One bounded incoming ID is preserved across gateway/backend/response; invalid or duplicate IDs are replaced at ingress. Authorization headers required by an implemented backend are preserved in transit and omitted from logs. Unknown API/realtime paths and legacy service prefixes are rejected instead of serving SPA HTML.
 
 Same-origin Vue/Flutter embedding uses a CSP compatible with the actual local CanvasKit/Wasm assets. `wasm-unsafe-eval` permits WebAssembly compilation; JavaScript `unsafe-eval` and wildcard sources are absent. Inline styles are required by the Flutter renderer and are browser-tested. No cross-origin auth or iframe isolation is introduced.
 

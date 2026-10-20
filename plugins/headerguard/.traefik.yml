@@ -1,0 +1,7 @@
+displayName: Pokerlost HTTP metadata guard
+type: middleware
+import: github.com/pokerlost/headerguard
+summary: Reject ambiguous routing headers and validate request correlation before upstream I/O.
+testData:
+  static: false
+  rejectUnknown: false

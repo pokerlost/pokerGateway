@@ -1,6 +1,6 @@
 # Gateway deployment
 
-The gateway runtime image is non-root, read-only and uses an exec Traefik PID 1 with bounded shutdown. Its Docker context contains only reviewed proxy configuration. BuildKit's existing private repository cache is the primary backend when CI is connected; cache restoration does not replace fresh proxy tests. No external registry package is published until approved.
+The gateway runtime image is non-root, read-only and uses an exec Traefik PID 1 with bounded shutdown. Its Docker context contains only reviewed proxy configuration and the bundled metadata guard. BuildKit's existing private repository cache is the primary backend when CI is connected; cache restoration does not replace fresh proxy tests. No external registry package is published until approved.
 
 The Helm wrapper vendors the exact checksummed upstream chart rather than copying controller templates. It uses Gateway API v1 routes, existing TLS references outside explicit localDevelopment, ClusterIP services, namespaced route references and no application deployment rights. Controller/CRDs may be installed only in the specifically created disposable cluster. Ordinary application service accounts never obtain those controller rights. No Traefik Hub subscription, paid control plane or production certificate is configured.
 
@@ -16,3 +16,16 @@ registry access, then exports that same graph with SBOM/provenance. Direct archi
 would lose those attestations; a cache miss can rebuild and must still match the tested
 configuration. The published OCI index digest and Docker configuration ID are separate
 identities. The existing BuildKit cache remains the only build-cache mechanism.
+
+## Header routing image
+
+Wrapper chart 0.2.0-dev.0 requires the same bundled gateway image used by file-provider acceptance, never the bare upstream image. The upstream base remains pinned in Dockerfile/versions.lock.json. platformInfra supplies its actual verified image tag/digest; versionOverride records the real Traefik binary version independently of the application image tag. Local plugin loading aborts on failure. No hostPath or downloaded remote plugin is used. Header guards validate ambiguity; native Header/HTTPRoute matching alone selects fixed named upstreams. Real Compose proxy acceptance and rendered Helm validation are separate from disposable-Kind acceptance.
+
+## Native configuration modes
+
+The image default command explicitly selects `/etc/pokerlost-compose.yaml` for
+file-provider local Compose. That file is outside Traefik's automatic config search
+path. Native Helm Pod args replace the image CMD and enable only Kubernetes
+providers/listeners; an auto-discovered Compose config must not shadow those args.
+Both modes load the same bundled guard. Static v3 matchers use one path per matcher
+joined by OR, verified through real HTTP rather than only YAML parsing.

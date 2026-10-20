@@ -1,0 +1,28 @@
+# Empty means unavailable (503), never an inferred client destination.
+# platformInfra replaces this file with its validated fixed environment map.
+http:
+  services:
+    auth:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
+    accounts:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
+    virtual-money:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
+    poker:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
+    crypto:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
+    website:
+      loadBalancer:
+        servers: []
+        passHostHeader: true
