@@ -10,12 +10,12 @@ The chart installs the controller default TLSOption with TLS 1.3 minimum and str
 
 Development OCI publication requires the exact full `GATEWAY_IMAGE_REVIEWED_SHA` repository variable and successful fresh proxy tests from the same run. Publication is restricted to the approved private `ghcr.io/pokerlost/pokergateway` package, checks the tested runtime configuration identity, and emits SBOM/provenance. No release or deployment is triggered.
 
-The CI transfer is a Docker image archive, which contains configuration/layers but no attested
-OCI index. Native Buildx checks the cached graph against the tested configuration before
-registry access, then exports that same graph with SBOM/provenance. Direct archive promotion
-would lose those attestations; a cache miss can rebuild and must still match the tested
-configuration. The published OCI index digest and Docker configuration ID are separate
-identities. The existing BuildKit cache remains the only build-cache mechanism.
+CI exports an attested OCI archive from the same workspace/cache after real tests and
+requires its configuration ID to match the tested Docker image. Delivery checks source/run,
+archive SHA-256 and the existing private package, then uses checksum-pinned official ORAS
+to copy the complete index by digest. SBOM/provenance remain index children. The publisher
+does not rebuild. Native registry readback requires the same root digest and tested image
+ID. BuildKit remains the build cache; an archive is a ready artifact, not another cache.
 
 ## Header routing image
 
@@ -35,3 +35,7 @@ joined by OR, verified through real HTTP rather than only YAML parsing.
 Native Make and Actions builds pin `SOURCE_DATE_EPOCH` to the exact source commit timestamp, using [BuildKit's supported reproducible-build input](https://docs.docker.com/build/ci/github-actions/reproducible-builds/). Wall-clock creation metadata must not change a tested configuration during private promotion. The strict tested image-ID comparison remains required; a cache hit alone is insufficient.
 
 Both Docker and OCI runtime exporters enable BuildKit rewrite-timestamp=true. SOURCE_DATE_EPOCH alone stabilizes creation metadata but does not ensure identical COPY layer metadata between fresh checkouts; strict pre/post-push image-ID checks remain in place.
+
+## Exact OCI promotion
+
+After tests, the same CI workspace exports runtime-image.oci.tar with SBOM/provenance and checks its config ID against the tested image. Delivery verifies its checksum and copies the complete OCI graph with official checksum-pinned ORAS 1.3.5. It requires an existing private destination before push and checks digest/config identity afterward. No new package, ACL, release or deployment is created implicitly.

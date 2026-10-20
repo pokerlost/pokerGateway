@@ -8,3 +8,5 @@ also copied to LICENSES/traefik-chart-Apache-2.0.txt. The header guard is origin
 The wrapper chart's MIT license applies to its original configuration; nested
 upstream files retain their notices. No Docker provider/socket or proprietary
 Traefik Hub component is enabled. Go/Python/Helm build tools retain upstream terms.
+
+The CI-only [ORAS CLI 1.3.5](https://github.com/oras-project/oras/tree/v1.3.5) and official setup action use Apache-2.0. The CLI is checksum-verified in the runner tool cache and is not included in the runtime image. Preserve its upstream license if redistributing that tool.
