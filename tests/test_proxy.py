@@ -151,8 +151,11 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
     targets = {
         name: content["http"]["services"].pop(name) for name in ("auth", "accounts")
     }
-    for name in ("virtual-money", "poker", "crypto", "website"):
+    for name in ("virtual-money", "poker", "crypto"):
         targets[name] = {"loadBalancer": {"servers": []}}
+    targets["website"] = {
+        "loadBalancer": {"servers": [{"url": "http://fixture-one:8080"}]}
+    }
     upstreams.write_text(yaml.safe_dump({"http": {"services": targets}}))
     extra.write_text(yaml.safe_dump(content))
     os.chmod(upstreams, 0o444)
@@ -221,9 +224,13 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             tuple(containers[:-1]),
         )
         with httpx.Client(trust_env=False, timeout=2) as client:
+            ready_upstreams: set[str] = set()
             for _ in range(100):
                 try:
-                    if client.get(result.url + "/technical/ready").status_code == 200:
+                    response = client.get(result.url + "/technical/ready")
+                    if response.status_code == 200:
+                        ready_upstreams.add(response.json()["fixture"])
+                    if ready_upstreams == {"one", "two"}:
                         break
                 except httpx.TransportError:
                     pass
@@ -234,6 +241,10 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
                 )
         yield result
     finally:
+        if containers:
+            evidence = ROOT / "coverage"
+            evidence.mkdir(exist_ok=True)
+            (evidence / "proxy-runtime.log").write_text(docker("logs", containers[-1]))
         for identifier in reversed(containers):
             docker("rm", "--force", identifier)
         docker("network", "rm", network)
@@ -564,6 +575,35 @@ def test_selected_unavailable_service_never_falls_back_to_another(proxy: Proxy) 
                 time.sleep(0.1)
             else:
                 raise AssertionError("Restarted selected upstream did not recover")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/about",
+        "/game",
+        "/game/",
+        "/favicon.ico",
+        "/favicon.svg",
+        "/robots.txt",
+        "/assets/probe.js",
+        "/game/probe.js",
+    ],
+)
+def test_native_static_matchers_route_only_to_the_web_upstream(
+    proxy: Proxy, path: str
+) -> None:
+    """Use a technical echo as web upstream; actual assets are tested in pokerWeb."""
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        response = client.get(proxy.url + path)
+        assert response.status_code == 200
+        assert response.json()["fixture"] == "one"
+        assert client.head(proxy.url + path).status_code == 200
+        rejected = client.get(
+            proxy.url + path, headers={"x-pokerlost-serviceId": "authService"}
+        )
+        assert rejected.status_code == 404
 
 
 def test_sigterm_drains_an_inflight_request_and_exits_within_the_bound(

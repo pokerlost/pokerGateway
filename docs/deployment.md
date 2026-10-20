@@ -20,3 +20,12 @@ identities. The existing BuildKit cache remains the only build-cache mechanism.
 ## Header routing image
 
 Wrapper chart 0.2.0-dev.0 requires the same bundled gateway image used by file-provider acceptance, never the bare upstream image. The upstream base remains pinned in Dockerfile/versions.lock.json. platformInfra supplies its actual verified image tag/digest; versionOverride records the real Traefik binary version independently of the application image tag. Local plugin loading aborts on failure. No hostPath or downloaded remote plugin is used. Header guards validate ambiguity; native Header/HTTPRoute matching alone selects fixed named upstreams. Real Compose proxy acceptance and rendered Helm validation are separate from disposable-Kind acceptance.
+
+## Native configuration modes
+
+The image default command explicitly selects `/etc/pokerlost-compose.yaml` for
+file-provider local Compose. That file is outside Traefik's automatic config search
+path. Native Helm Pod args replace the image CMD and enable only Kubernetes
+providers/listeners; an auto-discovered Compose config must not shadow those args.
+Both modes load the same bundled guard. Static v3 matchers use one path per matcher
+joined by OR, verified through real HTTP rather than only YAML parsing.

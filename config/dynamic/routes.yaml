@@ -108,9 +108,8 @@ http:
     website-web:
       entryPoints:
       - web
-      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`, `/about`, `/game`, `/game/`,
-        `/favicon.ico`, `/favicon.svg`, `/robots.txt`) || PathPrefix(`/assets/`, `/game/`))
-      priority: 50
+      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`) || Path(`/about`) || Path(`/game`) || Path(`/game/`) || Path(`/favicon.ico`) || Path(`/favicon.svg`) || Path(`/robots.txt`) || PathPrefix(`/assets/`) || PathPrefix(`/game/`))
+      priority: 200
       service: website
       middlewares:
       - security
@@ -128,9 +127,8 @@ http:
     website-websecure:
       entryPoints:
       - websecure
-      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`, `/about`, `/game`, `/game/`,
-        `/favicon.ico`, `/favicon.svg`, `/robots.txt`) || PathPrefix(`/assets/`, `/game/`))
-      priority: 50
+      rule: (Method(`GET`) || Method(`HEAD`)) && (Path(`/`) || Path(`/about`) || Path(`/game`) || Path(`/game/`) || Path(`/favicon.ico`) || Path(`/favicon.svg`) || Path(`/robots.txt`) || PathPrefix(`/assets/`) || PathPrefix(`/game/`))
+      priority: 200
       service: website
       middlewares:
       - security
