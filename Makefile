@@ -1,4 +1,4 @@
-override DOCKER_BUILD_ARGS += --build-arg SOURCE_COMMIT=$(shell git rev-parse HEAD)
+override DOCKER_BUILD_ARGS += --build-arg SOURCE_COMMIT=$(shell git rev-parse HEAD) --build-arg SOURCE_DATE_EPOCH=$(shell git log -1 --pretty=%ct)
 ifneq ($(CONTAINERIZED),1)
 QUALITY_IMAGE := pokergateway:quality
 RUNTIME_IMAGE := pokergateway:candidate

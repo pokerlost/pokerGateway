@@ -29,3 +29,7 @@ path. Native Helm Pod args replace the image CMD and enable only Kubernetes
 providers/listeners; an auto-discovered Compose config must not shadow those args.
 Both modes load the same bundled guard. Static v3 matchers use one path per matcher
 joined by OR, verified through real HTTP rather than only YAML parsing.
+
+## Reproducible image identity
+
+Native Make and Actions builds pin `SOURCE_DATE_EPOCH` to the exact source commit timestamp, using [BuildKit's supported reproducible-build input](https://docs.docker.com/build/ci/github-actions/reproducible-builds/). Wall-clock creation metadata must not change a tested configuration during private promotion. The strict tested image-ID comparison remains required; a cache hit alone is insufficient.
