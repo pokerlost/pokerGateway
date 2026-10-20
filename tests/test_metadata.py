@@ -45,7 +45,7 @@ def metadata_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         json.dumps(
             [
                 {
-                    "Id": "sha256:fixture",
+                    "Id": "sha256:" + "d" * 64,
                     "Config": {
                         "Labels": {
                             "org.opencontainers.image.version": "0.2.0-dev.0",
@@ -56,8 +56,9 @@ def metadata_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             ]
         )
     )
-    (tmp_path / "coverage/tested-image-id.txt").write_text("sha256:fixture\n")
+    (tmp_path / "coverage/tested-image-id.txt").write_text("sha256:" + "d" * 64 + "\n")
     (tmp_path / "coverage/source-commit.txt").write_text(COMMIT + "\n")
+    (tmp_path / "coverage/fixture-image-id.txt").write_text("sha256:" + "e" * 64)
     chart_archive(tmp_path, "3.7.15")
     return tmp_path
 
@@ -99,3 +100,27 @@ def test_source_identity_rejects_string_booleans(metadata_tree: Path) -> None:
     result = RUNNER.invoke(app, ["release-check"])
     assert result.exit_code != 0
     assert not (metadata_tree / "coverage/artifacts.json").exists()
+
+
+def test_offline_inputs_preserve_exact_source_and_images(metadata_tree: Path) -> None:
+    assert RUNNER.invoke(app, ["capture-offline"]).exit_code == 0
+    assert RUNNER.invoke(app, ["check-offline"]).exit_code == 0
+    (metadata_tree / "coverage/fixture-image-id.txt").write_text("sha256:" + "f" * 64)
+    result = RUNNER.invoke(app, ["check-offline"])
+    assert result.exit_code != 0
+    assert "Prepared gateway" in str(result.exception)
+
+
+def test_offline_inputs_reject_changed_source(metadata_tree: Path) -> None:
+    assert RUNNER.invoke(app, ["capture-offline"]).exit_code == 0
+    source = json.loads((metadata_tree / "coverage/source.json").read_text())
+    source["contentSha256"] = "f" * 64
+    (metadata_tree / "coverage/source.json").write_text(json.dumps(source))
+    assert RUNNER.invoke(app, ["check-offline"]).exit_code != 0
+
+
+def test_offline_inputs_reject_modified_chart_bytes(metadata_tree: Path) -> None:
+    assert RUNNER.invoke(app, ["capture-offline"]).exit_code == 0
+    archive = metadata_tree / "coverage/chart/poker-gateway-0.2.0-dev.0.tgz"
+    archive.write_bytes(archive.read_bytes() + b"changed")
+    assert RUNNER.invoke(app, ["check-offline"]).exit_code != 0

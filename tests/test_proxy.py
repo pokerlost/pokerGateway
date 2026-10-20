@@ -162,13 +162,19 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
     os.chmod(upstreams, 0o444)
     os.chmod(extra, 0o444)
     docker(
-        "network", "create", "--label", "io.codex.owner=platform-task-gateway", network
+        "network",
+        "create",
+        "--internal",
+        "--label",
+        "io.codex.owner=platform-task-gateway",
+        network,
     )
     try:
         for name in ("one", "two"):
             containers.append(
                 docker(
                     "run",
+                    "--pull=never",
                     "--detach",
                     "--read-only",
                     "--network",
@@ -188,6 +194,7 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             )
         identifier = docker(
             "run",
+            "--pull=never",
             "--detach",
             "--read-only",
             "--network",

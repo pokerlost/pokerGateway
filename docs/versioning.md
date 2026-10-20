@@ -38,3 +38,14 @@ chart and OCI label. `appVersion` is the pinned upstream Traefik version from
 `make verify` executes real isolated HTTP/TLS/WebSocket fixtures. Traefik coverage
 is not applicable and the bundled Go guard is not instrumented; report that limit
 instead of a synthetic percentage. Native pytest JUnit reports are retained.
+
+## Prepared offline acceptance
+
+After an online full pass on the same clean source, `OFFLINE=1 make ci-local`
+validates the saved source identity, runtime and fixture image IDs, and packaged
+chart checksum in `coverage/gateway-cache.json`. It reuses those exact artifacts
+without BuildKit or image pulls. Static/unit checks and actual HTTP/TLS/WebSocket
+proxy acceptance still run freshly; synthetic containers use an internal network,
+while host uv uses its prepared cache with `UV_OFFLINE=1`. Source changes, replaced
+images, changed chart bytes and missing prepared inputs reject reuse. The receipt
+remains separate from each fresh CI result; no image is published or relabelled.

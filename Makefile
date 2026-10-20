@@ -10,19 +10,35 @@ QUALITY_DIST_MOUNT = --mount "type=bind,source=$(CURDIR)/dist,target=/app/dist,r
 QUALITY_IMAGE := pokergateway:quality
 RUNTIME_IMAGE := pokergateway:candidate
 QUALITY_TEST := test-unit
+QUALITY_RUN_ARGS += --pull=never
 UV ?= uv
 QUALITY_EXTRA_TARGETS := chart-check
-BUILD_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
+ONLINE_BUILD_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
 COVERAGE_COMMAND = sh -ec 'printf "%s\n" "Coverage: external Traefik and declarative configuration notApplicable; bundled Go guard and Python metadata tooling notMeasured (executed by native tests, without coverage instrumentation)." | tee coverage/summary.md'
 VERIFY_COMMAND = GATEWAY_TEST_IMAGE=$(RUNTIME_IMAGE) $(MAKE) CONTAINERIZED=1 test && $(DOCKER) image inspect $(RUNTIME_IMAGE) --format '{{.Id}}' > coverage/tested-image-id.txt && git rev-parse HEAD > coverage/source-commit.txt
-IMAGE_COMMAND = $(DOCKER) buildx build $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --output type=docker,rewrite-timestamp=true --tag $(RUNTIME_IMAGE) .
+ifeq ($(OFFLINE),1)
+BUILD_COMMAND = $(RELEASE_CHECK_COMMAND)
+IMAGE_COMMAND = $(MAKE) gateway-offline-preflight
+else
+BUILD_COMMAND = $(ONLINE_BUILD_COMMAND)
+IMAGE_COMMAND = $(ONLINE_BUILD_COMMAND)
+endif
 BUILD_RECEIPT_COMMAND := true
 VERSION_COMMAND = $(QUALITY_RUN) python -m docker.project_metadata version
-RELEASE_CHECK_COMMAND = $(DOCKER) image inspect $(RUNTIME_IMAGE) > coverage/runtime-image.json && $(QUALITY_RUN) python -m docker.project_metadata release-check
+CACHE_METADATA_COMMAND = $(DOCKER) image inspect $(RUNTIME_IMAGE) > coverage/runtime-image.json && $(DOCKER) image inspect pokergateway:fixture --format '{{.Id}}' > coverage/fixture-image-id.txt
+ifeq ($(OFFLINE),1)
+RELEASE_CHECK_COMMAND = $(CACHE_METADATA_COMMAND) && $(QUALITY_RUN) python -m docker.project_metadata check-offline
+else
+RELEASE_CHECK_COMMAND = $(CACHE_METADATA_COMMAND) && $(QUALITY_RUN) python -m docker.project_metadata capture-offline
+endif
 RECEIPT_COMMAND = $(QUALITY_RUN) python docker/release.py receipt
-OFFLINE_PREFLIGHT_COMMAND = $(DOCKER) image inspect pokergateway:fixture traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368 >/dev/null || { echo "BLOCKED: prepare pinned Traefik and fixture images online first." >&2; exit 2; }
+OFFLINE_PREFLIGHT_COMMAND = $(MAKE) gateway-offline-preflight
 CI_LOCAL_TARGETS := check coverage build chart verify release-check
 include docker/quality-python.mk
+.PHONY: gateway-offline-preflight
+gateway-offline-preflight: source-identity
+	$(CACHE_METADATA_COMMAND)
+	$(QUALITY_RUN) python -m docker.project_metadata check-offline
 
 .PHONY: native-prerequisites
 help: native-prerequisites
@@ -34,11 +50,23 @@ build-metadata:
 
 .PHONY: fixture-image chart
 fixture-image:
+ifeq ($(OFFLINE),1)
+	$(MAKE) gateway-offline-preflight
+else
 	$(DOCKER) buildx build --file tests/Dockerfile $(DOCKER_BUILD_ARGS) $(LOCAL_BUILD_NETWORK) --load --tag pokergateway:fixture .
+endif
+ifeq ($(OFFLINE),1)
+verify: gateway-offline-preflight
+else
 verify: image fixture-image
+endif
 chart: quality-image
+ifeq ($(OFFLINE),1)
+	$(RELEASE_CHECK_COMMAND)
+else
 	@mkdir -p dist
 	$(QUALITY_RUN) make chart OUTPUT_DIR=/app/coverage/chart
+endif
 
 else
 .DEFAULT_GOAL := help

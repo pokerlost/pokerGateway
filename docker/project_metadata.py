@@ -90,6 +90,52 @@ def release_check() -> None:
     print("Gateway wrapper, Traefik, Helm and tested OCI image identities agree.")
 
 
+class OfflineInputs(BaseModel):
+    """Previously accepted immutable images and chart bytes for this source."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    source: Source
+    runtime_image_id: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    fixture_image_id: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+    chart_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+def offline_inputs() -> OfflineInputs:
+    expected = versions()
+    archive = Path("coverage/chart") / f"poker-gateway-{expected.wrapper}.tgz"
+    image = json.loads(Path("coverage/runtime-image.json").read_text())[0]
+    return OfflineInputs.model_validate(
+        {
+            "source": json.loads(Path("coverage/source.json").read_text()),
+            "runtime_image_id": image["Id"],
+            "fixture_image_id": Path("coverage/fixture-image-id.txt")
+            .read_text()
+            .strip(),
+            "chart_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+        }
+    )
+
+
+@app.command("capture-offline")
+def capture_offline() -> None:
+    """Capture native inputs only after successful proxy and artifact validation."""
+    release_check()
+    Path("coverage/gateway-cache.json").write_text(
+        offline_inputs().model_dump_json(by_alias=True, indent=2) + "\n"
+    )
+
+
+@app.command("check-offline")
+def check_offline() -> None:
+    """Reject replaced images, source changes and modified chart bytes."""
+    saved = OfflineInputs.model_validate_json(
+        Path("coverage/gateway-cache.json").read_text()
+    )
+    if saved != offline_inputs():
+        raise ValueError("Prepared gateway source, images or chart bytes changed")
+    release_check()
+
+
 @app.command("version")
 def show_version() -> None:
     """Show the independently owned wrapper, upstream and tool versions."""
