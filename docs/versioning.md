@@ -49,3 +49,9 @@ proxy acceptance still run freshly; synthetic containers use an internal network
 while host uv uses its prepared cache with `UV_OFFLINE=1`. Source changes, replaced
 images, changed chart bytes and missing prepared inputs reject reuse. The receipt
 remains separate from each fresh CI result; no image is published or relabelled.
+
+Acceptance requires a Linux Docker host with direct access to its private bridge
+addresses. The harness uses the isolated gateway IP without publishing host ports;
+its temporary certificate includes that exact IP as a SAN, and TLS verification
+remains enabled. The network fixture cleans up its network after the synthetic
+containers, including setup failures.
