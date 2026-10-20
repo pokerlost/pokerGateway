@@ -20,15 +20,27 @@
     },
     "docker/quality.mk": {
       "source": "template/docker/quality.mk",
-      "sha256": "881cd3677effdf37503bd4c1980c0ce11403a6306bb8cdb2974779ff601fa6a4"
+      "sha256": "5da1c65ef9610cb28bf0652e908ec785c2cb37d677d1995856c28a292785eb85",
+      "revision": "1aaab606373980a6084ae1a69069280241fb27de"
     },
     "docker/quality-python.mk": {
       "source": "template/docker/quality-python.mk",
-      "sha256": "65cc6b6a47ebead0dc56466f88fbc507d61556119f7c38de2ef61f6a6f449224"
+      "sha256": "7a035479394a82b085e67f986a237c964e085022594678d2bba490529e18d655",
+      "revision": "1aaab606373980a6084ae1a69069280241fb27de"
     },
     "docker/coverage_report.py": {
       "source": "template/docker/coverage_report.py",
       "sha256": "75c5b398842ae3199da118ef5c15ce9616c3b6de921de98056bdcb1744e4c85e"
+    },
+    "docker/source_identity.sh": {
+      "source": "template/docker/source_identity.sh",
+      "sha256": "efe087bf133fc2c4c9a02ee4a3935e77d4a39ded3b14387c3dde0d90ef25ecc7",
+      "revision": "1aaab606373980a6084ae1a69069280241fb27de"
+    },
+    "docker/release.py": {
+      "source": "template/docker/release.py",
+      "sha256": "2362df1b29d3a3f458d4adbaf6f1baeed7f93ca0f63959cc036f19763fead02e",
+      "revision": "1aaab606373980a6084ae1a69069280241fb27de"
     }
   },
   "rules": {
@@ -39,5 +51,6 @@
     "engineering": "https://github.com/serrja/pythonTemplate/blob/main/docs/engineering.md"
   },
   "codeowners": "Project-specific assignment; not inherited from the template.",
-  "role": "Reviewed portable engineering snapshots; no active scaffold restoration or template-update dependency."
+  "role": "Reviewed portable engineering snapshots; no active scaffold restoration or template-update dependency.",
+  "latestUpdateRevision": "1aaab606373980a6084ae1a69069280241fb27de"
 }

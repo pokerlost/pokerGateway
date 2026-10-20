@@ -17,6 +17,11 @@ publishes. The separate owner/full-SHA manual delivery consumes a successful exa
 candidate archive, checks the tested image identity, and writes only the approved private
 package with SBOM/provenance. Merge, releases and production deployment remain separate.
 
+Run `make help` for native tasks, `make version` for canonical artifact versions,
+and `make ci-local` for the local required checks and `coverage/ci-local.json`.
+`make release-check` validates built artifact identity; it does not publish or tag.
+See [version and release policy](docs/versioning.md).
+
 ## 📄 License
 
 Original source/documentation uses [MIT](LICENSE). Preserve the
