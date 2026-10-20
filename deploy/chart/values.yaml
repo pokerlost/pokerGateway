@@ -10,9 +10,9 @@ services:
   cryptoService: platform-crypto
 traefik:
   image:
-    repository: traefik
-    tag: v3.7.15
-    digest: sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
+    repository: ghcr.io/pokerlost/pokergateway
+    tag: ''
+    digest: null
   gateway:
     enabled: false
   gatewayClass:
@@ -54,12 +54,29 @@ traefik:
         lifeCycle:
           requestAcceptGraceTimeout: 2s
           graceTimeOut: 15s
+      http:
+        encodedCharacters:
+          allowEncodedSlash: false
+          allowEncodedBackSlash: false
+          allowEncodedNullCharacter: false
+          allowEncodedSemicolon: false
+          allowEncodedPercent: false
+          allowEncodedQuestionMark: false
+          allowEncodedHash: false
     websecure:
       port: 8443
       exposedPort: 443
       http:
         tls:
           enabled: false
+        encodedCharacters:
+          allowEncodedSlash: false
+          allowEncodedBackSlash: false
+          allowEncodedNullCharacter: false
+          allowEncodedSemicolon: false
+          allowEncodedPercent: false
+          allowEncodedQuestionMark: false
+          allowEncodedHash: false
       forwardedHeaders:
         insecure: false
   deployment:
@@ -85,6 +102,8 @@ traefik:
   additionalArguments:
   - --global.checknewversion=false
   - --global.sendanonymoususage=false
+  - --experimental.localPlugins.headerguard.moduleName=github.com/pokerlost/headerguard
+  - --experimental.abortOnPluginFailure=true
   log:
     format: json
     level: INFO
@@ -92,6 +111,21 @@ traefik:
     enabled: true
     format: json
     fields:
-      defaultMode: keep
+      defaultMode: drop
+      names:
+        StartUTC: keep
+        Duration: keep
+        DownstreamStatus: keep
+        RequestMethod: keep
+        RouterName: keep
+        ServiceName: keep
       headers:
         defaultMode: drop
+        names:
+          X-Request-Id: keep
+  metrics:
+    prometheus:
+      entryPoint: traefik
+      addRoutersLabels: true
+      addServicesLabels: true
+  versionOverride: v3.7.15

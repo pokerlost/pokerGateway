@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import ssl
 import subprocess
 import time
@@ -11,6 +12,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
@@ -83,7 +85,7 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
                             "middlewares": [
                                 "security",
                                 "bounded-body",
-                                "remove-client-request-id",
+                                "static-guard",
                                 "technical-prefix",
                             ],
                         },
@@ -112,6 +114,14 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
                         }
                     },
                     "services": {
+                        "auth": {
+                            "loadBalancer": {"servers": [{"url": "http://auth:8080"}]}
+                        },
+                        "accounts": {
+                            "loadBalancer": {
+                                "servers": [{"url": "http://accounts:8080"}]
+                            }
+                        },
                         "echo": {
                             "loadBalancer": {
                                 "servers": [
@@ -136,6 +146,16 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             }
         )
     )
+    upstreams = directory / "upstreams.yaml"
+    content = yaml.safe_load(extra.read_text())
+    targets = {
+        name: content["http"]["services"].pop(name) for name in ("auth", "accounts")
+    }
+    for name in ("virtual-money", "poker", "crypto", "website"):
+        targets[name] = {"loadBalancer": {"servers": []}}
+    upstreams.write_text(yaml.safe_dump({"http": {"services": targets}}))
+    extra.write_text(yaml.safe_dump(content))
+    os.chmod(upstreams, 0o444)
     os.chmod(extra, 0o444)
     docker(
         "network", "create", "--label", "io.codex.owner=platform-task-gateway", network
@@ -151,6 +171,8 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
                     network,
                     "--network-alias",
                     "fixture-" + name,
+                    "--network-alias",
+                    "auth" if name == "one" else "accounts",
                     "--cap-drop",
                     "ALL",
                     "--security-opt",
@@ -181,10 +203,12 @@ def proxy(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Proxy]:
             "--mount",
             f"type=bind,source={extra},target=/etc/traefik/dynamic/acceptance.yaml,readonly",
             "--mount",
+            f"type=bind,source={upstreams},target=/etc/traefik/dynamic/upstreams.yaml,readonly",
+            "--mount",
             f"type=bind,source={cert},target=/run/fixture-tls/cert.pem,readonly",
             "--mount",
             f"type=bind,source={key},target=/run/fixture-tls/key.pem,readonly",
-            "pokergateway:candidate",
+            os.environ.get("GATEWAY_TEST_IMAGE", "pokergateway:candidate"),
         )
         containers.append(identifier)
         http_port = docker("port", identifier, "8080/tcp").rsplit(":", 1)[1]
@@ -260,7 +284,8 @@ def test_headers_body_limit_and_no_mutation_retry(proxy: Proxy) -> None:
         assert value["host"] == "gateway.example.invalid"
         assert value["authorization"] == "Bearer synthetic-validation-token"
         assert value["body_size"] == 7 and value["path"] == "/echo"
-        assert value["client_id"] is None
+        assert value["client_id"] == "client-supplied-id"
+        assert response.headers["x-request-id"] == value["client_id"]
         assert value["forwarded_host"] != "untrusted.invalid"
         assert value["forwarded_proto"] == "http"
         assert "203.0.113.255" not in value["forwarded_for"]
@@ -281,7 +306,7 @@ def test_headers_body_limit_and_no_mutation_retry(proxy: Proxy) -> None:
         )
         assert after - before == 1
     assert "synthetic-validation-token" not in docker("logs", proxy.identifier)
-    assert "client-supplied-id" not in docker("logs", proxy.identifier)
+    assert "client-supplied-id" in docker("logs", proxy.identifier)
 
 
 def test_real_https_and_websockets_keep_one_upstream_per_connection(
@@ -336,6 +361,209 @@ def test_one_failed_upstream_is_visible_without_replaying_requests(
                 time.sleep(0.1)
             else:
                 raise AssertionError("Restarted fixture did not recover")
+
+
+@pytest.mark.parametrize("field", ["x-pokerlost-serviceId", "X-POKERLOST-SERVICEID"])
+def test_header_only_service_selection_and_auth_headers(
+    proxy: Proxy, field: str
+) -> None:
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        for service, expected in (("authService", "one"), ("accountsService", "two")):
+            response = client.post(
+                proxy.url + "/technicalProbe",
+                headers={field: service, "X-Request-ID": "routing-acceptance"},
+            )
+            assert response.status_code == 200
+            assert response.json()["fixture"] == expected
+            assert response.json()["path"] == "/technicalProbe"
+            assert response.json()["client_id"] == "routing-acceptance"
+            assert response.headers["x-request-id"] == "routing-acceptance"
+
+
+@pytest.mark.parametrize(
+    ("headers", "status", "error"),
+    [
+        ([], 400, "POKERLOST_SERVICE_ID_REQUIRED"),
+        ([("x-pokerlost-serviceId", "")], 400, "POKERLOST_SERVICE_ID_INVALID"),
+        ([("x-pokerlost-serviceId", "127.0.0.1")], 400, "POKERLOST_SERVICE_ID_INVALID"),
+        ([("x-pokerlost-serviceId", "unknown")], 404, "POKERLOST_SERVICE_ID_UNKNOWN"),
+        (
+            [("x-pokerlost-serviceId", "AccountsService")],
+            404,
+            "POKERLOST_SERVICE_ID_UNKNOWN",
+        ),
+        (
+            [("x-pokerlost-serviceId", "http://127.0.0.1")],
+            400,
+            "POKERLOST_SERVICE_ID_INVALID",
+        ),
+        (
+            [("x-pokerlost-serviceId", "../authService")],
+            400,
+            "POKERLOST_SERVICE_ID_INVALID",
+        ),
+        (
+            [("x-pokerlost-serviceId", "authService,accountsService")],
+            400,
+            "POKERLOST_SERVICE_ID_INVALID",
+        ),
+        (
+            [
+                ("x-pokerlost-serviceId", "authService"),
+                ("X-Pokerlost-ServiceId", "accountsService"),
+            ],
+            400,
+            "POKERLOST_SERVICE_ID_INVALID",
+        ),
+        (
+            [
+                ("x-pokerlost-serviceId", "authService"),
+                ("x-pokerlost-serviceId", "authService"),
+            ],
+            400,
+            "POKERLOST_SERVICE_ID_INVALID",
+        ),
+    ],
+)
+def test_ambiguous_service_fields_fail_before_upstream(
+    proxy: Proxy, headers: list[tuple[str, str]], status: int, error: str
+) -> None:
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        response = client.post(proxy.url + "/technicalProbe", headers=headers)
+        assert response.status_code == status
+        assert response.json()["error"] == error
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/authService/technicalProbe",
+        "/api/accountsService/",
+        "/metrics",
+        "/healthz",
+        "/getProbe/",
+        "/%61pi/authService/technicalProbe",
+    ],
+)
+def test_internal_and_legacy_paths_are_never_public(proxy: Proxy, path: str) -> None:
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        response = client.post(
+            proxy.url + path, headers={"x-pokerlost-serviceId": "authService"}
+        )
+        assert response.status_code == 404
+
+
+def test_same_origin_policy_rejects_cross_origin_preflight(proxy: Proxy) -> None:
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        response = client.options(
+            proxy.url + "/technicalProbe",
+            headers={
+                "Origin": "https://untrusted.invalid",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "x-pokerlost-serviceId,authorization",
+            },
+        )
+        assert response.status_code == 403
+        assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize(
+    ("token", "status"),
+    [(None, 401), ("invalid", 401), ("fixture-no-scope", 403), ("fixture-valid", 200)],
+)
+def test_backend_authorization_and_protocol_headers_are_preserved(
+    proxy: Proxy, token: str | None, status: int
+) -> None:
+    headers = {
+        "x-pokerlost-serviceId": "authService",
+        "X-Request-ID": "auth-boundary-probe",
+    }
+    if token is not None:
+        headers["Authorization"] = "Bearer " + token
+    with httpx.Client(trust_env=False, timeout=5) as client:
+        reply = client.post(proxy.url + "/protectedProbe", headers=headers)
+        assert reply.status_code == status
+        assert reply.headers["x-request-id"] == "auth-boundary-probe"
+        if status == 401:
+            assert reply.headers["www-authenticate"] == "Bearer"
+        method = client.get(proxy.url + "/methodProbe", headers=headers)
+        assert method.status_code == 405 and method.headers["allow"] == "POST"
+        retry = client.post(proxy.url + "/retryProbe", headers=headers)
+        assert retry.status_code == 503 and retry.headers["retry-after"] == "1"
+
+
+def test_real_http2_selection_and_duplicate_rejection(proxy: Proxy) -> None:
+    context = ssl.create_default_context(cafile=str(proxy.ca))
+    with httpx.Client(trust_env=False, verify=context, http2=True, timeout=5) as client:
+        for name, expected in [("authService", "one"), ("accountsService", "two")]:
+            reply = client.post(
+                proxy.tls_url + "/technicalProbe",
+                headers={"X-Pokerlost-ServiceId": name},
+            )
+            assert reply.http_version == "HTTP/2"
+            assert reply.status_code == 200 and reply.json()["fixture"] == expected
+        reply = client.post(
+            proxy.tls_url + "/technicalProbe",
+            headers=[
+                ("x-pokerlost-serviceId", "authService"),
+                ("X-POKERLOST-SERVICEID", "accountsService"),
+            ],
+        )
+        assert reply.http_version == "HTTP/2" and reply.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        b"authService\rinjected",
+        b"authService\x00injected",
+        b"authService\r\nx-pokerlost-serviceId: accountsService",
+    ],
+)
+def test_raw_malformed_or_injected_fields_fail_closed(
+    proxy: Proxy, value: bytes
+) -> None:
+    target = urlsplit(proxy.url)
+    with socket.create_connection(
+        (target.hostname or "127.0.0.1", target.port or 80), timeout=5
+    ) as connection:
+        connection.sendall(
+            b"POST /technicalProbe HTTP/1.1\r\nHost: localhost\r\n"
+            b"Content-Length: 0\r\nx-pokerlost-serviceId: "
+            + value
+            + b"\r\nConnection: close\r\n\r\n"
+        )
+        response = connection.recv(8192)
+    assert response.startswith(b"HTTP/1.1 400"), response[:80]
+
+
+def test_selected_unavailable_service_never_falls_back_to_another(proxy: Proxy) -> None:
+    docker("stop", "--time", "5", proxy.upstreams[0])
+    try:
+        with httpx.Client(trust_env=False, timeout=5) as client:
+            failed = client.post(
+                proxy.url + "/technicalProbe",
+                headers={"x-pokerlost-serviceId": "authService"},
+            )
+            healthy = client.post(
+                proxy.url + "/technicalProbe",
+                headers={"x-pokerlost-serviceId": "accountsService"},
+            )
+            assert failed.status_code == 502
+            assert healthy.status_code == 200 and healthy.json()["fixture"] == "two"
+    finally:
+        docker("start", proxy.upstreams[0])
+        with httpx.Client(trust_env=False, timeout=2) as client:
+            for _ in range(50):
+                reply = client.post(
+                    proxy.url + "/technicalProbe",
+                    headers={"x-pokerlost-serviceId": "authService"},
+                )
+                if reply.status_code == 200:
+                    break
+                time.sleep(0.1)
+            else:
+                raise AssertionError("Restarted selected upstream did not recover")
 
 
 def test_sigterm_drains_an_inflight_request_and_exits_within_the_bound(

@@ -2,6 +2,10 @@
 FROM traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368 AS runtime
 ARG SOURCE_COMMIT
 COPY --chmod=u=rwX,go=rX config/ /etc/traefik/
+COPY --chmod=u=rwX,go=rX plugins/headerguard/ /plugins-local/src/github.com/pokerlost/headerguard/
+COPY --chmod=0444 LICENSE THIRD_PARTY_NOTICES.md /licenses/
+COPY --chmod=u=rwX,go=rX LICENSES/ /licenses/third-party/
+LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/pokerlost/pokerGateway"
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 USER 65532:65532

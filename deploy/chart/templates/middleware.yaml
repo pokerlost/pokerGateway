@@ -22,3 +22,32 @@ spec:
       Cross-Origin-Embedder-Policy: "require-corp"
       Cross-Origin-Resource-Policy: "same-origin"
       Permissions-Policy: "camera=(), microphone=(), geolocation=()"
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-header-guard
+spec:
+  plugin:
+    headerguard: {}
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-static-guard
+spec:
+  plugin:
+    headerguard:
+      static: true
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-reject-service
+spec:
+  plugin:
+    headerguard:
+      rejectUnknown: true

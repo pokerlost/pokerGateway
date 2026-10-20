@@ -17,6 +17,15 @@ entryPoints:
       lifeCycle:
         requestAcceptGraceTimeout: 2s
         graceTimeOut: 15s
+    http:
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
   websecure:
     address: :8443
     forwardedHeaders:
@@ -29,6 +38,15 @@ entryPoints:
       lifeCycle:
         requestAcceptGraceTimeout: 2s
         graceTimeOut: 15s
+    http:
+      encodedCharacters:
+        allowEncodedSlash: false
+        allowEncodedBackSlash: false
+        allowEncodedNullCharacter: false
+        allowEncodedSemicolon: false
+        allowEncodedPercent: false
+        allowEncodedQuestionMark: false
+        allowEncodedHash: false
   ping:
     address: :8082
 ping:
@@ -43,11 +61,30 @@ log:
 accessLog:
   format: json
   fields:
-    defaultMode: keep
+    defaultMode: drop
+    names:
+      StartUTC: keep
+      Duration: keep
+      DownstreamStatus: keep
+      RequestMethod: keep
+      RouterName: keep
+      ServiceName: keep
     headers:
       defaultMode: drop
+      names:
+        X-Request-Id: keep
 serversTransport:
   forwardingTimeouts:
     dialTimeout: 5s
     responseHeaderTimeout: 30s
     idleConnTimeout: 90s
+experimental:
+  localPlugins:
+    headerguard:
+      moduleName: github.com/pokerlost/headerguard
+  abortOnPluginFailure: true
+metrics:
+  prometheus:
+    entryPoint: ping
+    addRoutersLabels: true
+    addServicesLabels: true

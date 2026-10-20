@@ -14,6 +14,47 @@ slow_requests = 0
 
 async def handle(request: web.Request) -> web.StreamResponse:
     global failed_posts, slow_requests
+    if request.path == "/protectedProbe":
+        token = request.headers.get("Authorization")
+        if token != "Bearer fixture-valid":
+            status = 403 if token == "Bearer fixture-no-scope" else 401
+            return web.json_response(
+                {
+                    "ok": False,
+                    "result": None,
+                    "error": "FIXTURE_FORBIDDEN"
+                    if status == 403
+                    else "FIXTURE_UNAUTHORIZED",
+                    "error_message": None,
+                    "retry_after": None,
+                },
+                status=status,
+                headers={"WWW-Authenticate": "Bearer"} if status == 401 else {},
+            )
+    if request.path == "/methodProbe" and request.method != "POST":
+        return web.json_response(
+            {
+                "ok": False,
+                "result": None,
+                "error": "FIXTURE_METHOD_NOT_ALLOWED",
+                "error_message": None,
+                "retry_after": None,
+            },
+            status=405,
+            headers={"Allow": "POST"},
+        )
+    if request.path == "/retryProbe":
+        return web.json_response(
+            {
+                "ok": False,
+                "result": None,
+                "error": "FIXTURE_UNAVAILABLE",
+                "error_message": None,
+                "retry_after": 1,
+            },
+            status=503,
+            headers={"Retry-After": "1"},
+        )
     if request.path == "/ws":
         socket = web.WebSocketResponse(heartbeat=2)
         await socket.prepare(request)

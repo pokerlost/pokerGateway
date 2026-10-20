@@ -26,9 +26,63 @@
     },
     "services": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string",
-        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      "additionalProperties": false,
+      "required": [
+        "authService",
+        "accountsService",
+        "virtualMoney",
+        "pokerService",
+        "cryptoService"
+      ],
+      "properties": {
+        "authService": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "accountsService": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "virtualMoney": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "pokerService": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "cryptoService": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "traefik": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "required": [
+            "repository",
+            "tag"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string"
+            },
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(sha256:[0-9a-f]{64})?$"
+            }
+          }
+        }
       }
     }
   },
@@ -48,6 +102,60 @@
           },
           "hostnames": {
             "minItems": 1
+          },
+          "traefik": {
+            "properties": {
+              "image": {
+                "properties": {
+                  "digest": {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "digest"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "localDevelopment": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "traefik": {
+            "properties": {
+              "image": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "tag": {
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "digest": {
+                        "pattern": "^sha256:[0-9a-f]{64}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "digest"
+                    ]
+                  }
+                ]
+              }
+            }
           }
         }
       }

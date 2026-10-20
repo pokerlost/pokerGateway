@@ -4,3 +4,12 @@
 !config/**
 .vscode/
 .serena/
+
+!plugins/
+!plugins/headerguard/
+!plugins/headerguard/**
+
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!LICENSES/
+!LICENSES/**
