@@ -1,3 +1,12 @@
+ifeq ($(CONTAINERIZED),1)
+RUFF ?= ruff
+else
+RUFF ?= uvx --from ruff==0.16.4 ruff
+endif
+# Quick dev commands never prepare a product/build image.
+ifneq ($(filter lint format format-check check,$(MAKECMDGOALS)),)
+override CONTAINERIZED := 1
+endif
 ifeq ($(OFFLINE),1)
 export UV_OFFLINE := 1
 endif
@@ -33,7 +42,9 @@ RELEASE_CHECK_COMMAND = $(CACHE_METADATA_COMMAND) && $(QUALITY_RUN) python -m do
 endif
 RECEIPT_COMMAND = $(QUALITY_RUN) python docker/release.py receipt
 OFFLINE_PREFLIGHT_COMMAND = $(MAKE) gateway-offline-preflight
-CI_LOCAL_TARGETS := check coverage build chart verify release-check
+CI_LOCAL_TARGETS := acceptance coverage build chart verify release-check
+QUALITY_EXTRA_TARGETS += acceptance
+CI_LOCAL_TARGETS ?= acceptance coverage build verify release-check
 include docker/quality-python.mk
 .PHONY: gateway-offline-preflight
 gateway-offline-preflight: source-identity
@@ -79,8 +90,8 @@ help:
 install:
 	$(UV) sync --locked --group fixture
 lint:
-	$(UV) run --locked ruff check tests docker/project_metadata.py
-	$(UV) run --locked ruff format --check tests docker/project_metadata.py
+	$(RUFF) check tests docker/project_metadata.py
+	$(RUFF) format --check tests docker/project_metadata.py
 typecheck:
 	$(UV) run --locked mypy tests docker/project_metadata.py
 build:
@@ -94,8 +105,17 @@ test-unit:
 	$(UV) run --locked pytest tests/test_configuration.py tests/test_metadata.py --junitxml=coverage/configuration.xml
 test:
 	$(UV) run --locked --python 3.14.7 pytest tests/test_proxy.py --junitxml=coverage/proxy.xml
-check: lint typecheck test-unit chart-check
+check: lint ## Fast lint-only gate; no tests/build.
+
+acceptance: lint typecheck test-unit chart-check
 run:
 	$(DOCKER) compose --project-name poker-gateway-local up --detach --wait --wait-timeout 60
 
 endif
+
+.PHONY: dev-policy-help
+help: dev-policy-help
+dev-policy-help:
+	@printf '%s\n' 'Daily: make lint; explicit git push origin dev.' \
+	  'Manual only: test, typecheck, coverage, build, acceptance, ci-local.' \
+	  'Native lint tools must be installed; lint never syncs/builds the application.'

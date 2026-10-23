@@ -27,3 +27,5 @@ See [version and release policy](docs/versioning.md).
 Original source/documentation uses [MIT](LICENSE). Preserve the
 [third-party notices](THIRD_PARTY_NOTICES.md); upstream assets, distributions and
 private data retain their own terms and access boundaries.
+
+[Runtime environments and isolation](docs/environments.md)
